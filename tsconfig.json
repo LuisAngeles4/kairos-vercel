@@ -5,7 +5,7 @@
     "api/**/*.ts",
     "vite.config.ts",
     "eslint.config.js"
-  ],
+, "api/send-email.js"  ],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",

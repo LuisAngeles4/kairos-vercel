@@ -1,7 +1,7 @@
-const { Resend } = require("resend");
+import { Resend } from "resend";
 
-module.exports = async function handler(req, res) {
-  // Solo permitir peticiones POST
+export default async function handler(req, res) {
+  // Permitir solo peticiones POST
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Método no permitido." });
   }
@@ -24,10 +24,10 @@ module.exports = async function handler(req, res) {
 
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: "RESEND_API_KEY no está configurada en Vercel." });
+      return res.status(500).json({ error: "RESEND_API_KEY no está configurada." });
     }
 
-    // Envío de correo con Resend
+    // Envío con Resend
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from: "Kairos <onboarding@resend.dev>",
@@ -37,13 +37,13 @@ module.exports = async function handler(req, res) {
     });
 
     if (error) {
-      console.error("Resend error:", error);
-      return res.status(400).json({ error: "No se pudo enviar el correo." });
+      console.error("Error de Resend:", error);
+      return res.status(400).json({ error: "No se pudo enviar el correo.", details: error });
     }
 
     return res.status(200).json({ id: data?.id, success: true });
   } catch (err) {
-    console.error("Server error:", err);
-    return res.status(500).json({ error: "Error interno del servidor." });
+    console.error("Error en Serverless Function:", err);
+    return res.status(500).json({ error: "Error interno del servidor.", details: err.message });
   }
-};
+}
