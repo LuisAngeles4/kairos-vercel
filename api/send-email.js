@@ -1,10 +1,8 @@
 import { Resend } from "resend";
 
-type SendEmailData = { to: string; subject: string; html: string };
-
-export async function POST(request: Request) {
+export async function POST(request) {
   try {
-    const { to, subject, html } = (await request.json()) as Partial<SendEmailData>;
+    const { to, subject, html } = await request.json();
 
     // Validaciones
     if (typeof to !== "string" || !to.trim()) {
@@ -46,14 +44,13 @@ export async function POST(request: Request) {
     });
 
     if (error) {
-      console.error("Resend error", error);
       return new Response(
         JSON.stringify({ error: "No se pudo enviar el correo." }),
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    return new Response(JSON.stringify({ id: data?.id }), {
+    return new Response(JSON.stringify({ id: data?.id, success: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
