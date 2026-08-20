@@ -1,40 +1,33 @@
-import { Resend } from "resend";
+const { Resend } = require("resend");
 
-export async function POST(request) {
+module.exports = async function handler(req, res) {
+  // Solo permitir peticiones POST
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Método no permitido." });
+  }
+
   try {
-    const { to, subject, html } = await request.json();
+    const { to, subject, html } = req.body || {};
 
     // Validaciones
-    if (typeof to !== "string" || !to.trim()) {
-      return new Response(JSON.stringify({ error: "Destinatario inválido." }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+    if (!to || typeof to !== "string" || !to.trim()) {
+      return res.status(400).json({ error: "Destinatario inválido." });
     }
 
-    if (typeof subject !== "string" || !subject.trim()) {
-      return new Response(JSON.stringify({ error: "Asunto vacío." }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+    if (!subject || typeof subject !== "string" || !subject.trim()) {
+      return res.status(400).json({ error: "Asunto vacío." });
     }
 
-    if (typeof html !== "string" || !html.trim()) {
-      return new Response(JSON.stringify({ error: "Contenido vacío." }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+    if (!html || typeof html !== "string" || !html.trim()) {
+      return res.status(400).json({ error: "Contenido vacío." });
     }
 
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({ error: "RESEND_API_KEY no está configurada." }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
+      return res.status(500).json({ error: "RESEND_API_KEY no está configurada en Vercel." });
     }
 
-    // Envío con Resend
+    // Envío de correo con Resend
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from: "Kairos <onboarding@resend.dev>",
@@ -44,20 +37,13 @@ export async function POST(request) {
     });
 
     if (error) {
-      return new Response(
-        JSON.stringify({ error: "No se pudo enviar el correo." }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
+      console.error("Resend error:", error);
+      return res.status(400).json({ error: "No se pudo enviar el correo." });
     }
 
-    return new Response(JSON.stringify({ id: data?.id, success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return res.status(200).json({ id: data?.id, success: true });
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: "Error interno del servidor." }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
+    console.error("Server error:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
   }
-}
+};
