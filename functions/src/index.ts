@@ -1,40 +1,42 @@
-import "dotenv/config";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { Resend } from "resend";
 
 type SendEmailData = { to: string; subject: string; html: string };
 
-export const sendEmail = onCall(
-  {
-    region: "us-central1",
-    cors: [
-      "http://localhost:8080",
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://kairos-run-progress.lovable.app",
-    ],
-  },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "Debes iniciar sesión para enviar correos.");
+export async function POST(request: Request) {
+  try {
+    const { to, subject, html } = (await request.json()) as Partial<SendEmailData>;
+
+    // Validaciones
+    if (typeof to !== "string" || !to.trim()) {
+      return new Response(JSON.stringify({ error: "Destinatario inválido." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    const { to, subject, html } = request.data as Partial<SendEmailData>;
-    if (typeof to !== "string" || !to.trim()) {
-      throw new HttpsError("invalid-argument", "Destinatario inválido.");
-    }
     if (typeof subject !== "string" || !subject.trim()) {
-      throw new HttpsError("invalid-argument", "Asunto vacío.");
+      return new Response(JSON.stringify({ error: "Asunto vacío." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
+
     if (typeof html !== "string" || !html.trim()) {
-      throw new HttpsError("invalid-argument", "Contenido vacío.");
+      return new Response(JSON.stringify({ error: "Contenido vacío." }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      throw new HttpsError("failed-precondition", "RESEND_API_KEY no está configurada.");
+      return new Response(
+        JSON.stringify({ error: "RESEND_API_KEY no está configurada." }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
     }
 
+    // Envío con Resend
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from: "Kairos <onboarding@resend.dev>",
@@ -42,10 +44,23 @@ export const sendEmail = onCall(
       subject: subject.trim(),
       html,
     });
+
     if (error) {
       console.error("Resend error", error);
-      throw new HttpsError("internal", "No se pudo enviar el correo.");
+      return new Response(
+        JSON.stringify({ error: "No se pudo enviar el correo." }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
-    return { id: data?.id };
-  },
-);
+
+    return new Response(JSON.stringify({ id: data?.id }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ error: "Error interno del servidor." }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}

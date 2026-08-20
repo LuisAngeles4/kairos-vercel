@@ -1,48 +1,50 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendEmail = void 0;
-require("dotenv/config");
-const https_1 = require("firebase-functions/v2/https");
-const resend_1 = require("resend");
-exports.sendEmail = (0, https_1.onCall)(
-  {
-    region: "us-central1",
-    cors: [
-      "http://localhost:8080",
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "https://kairos-run-progress.lovable.app",
-    ],
-  },
-  async (request) => {
-    if (!request.auth) {
-      throw new https_1.HttpsError("unauthenticated", "Debes iniciar sesión para enviar correos.");
-    }
-    const { to, subject, html } = request.data;
+
+const { Resend } = require("resend");
+
+module.exports = async function handler(req, res) {
+  // Solo permitir peticiones POST
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Método no permitido. Usa POST." });
+  }
+
+  try {
+    const { to, subject, html } = req.body || {};
+
+    // Validaciones
     if (typeof to !== "string" || !to.trim()) {
-      throw new https_1.HttpsError("invalid-argument", "Destinatario inválido.");
+      return res.status(400).json({ error: "Destinatario inválido." });
     }
     if (typeof subject !== "string" || !subject.trim()) {
-      throw new https_1.HttpsError("invalid-argument", "Asunto vacío.");
+      return res.status(400).json({ error: "Asunto vacío." });
     }
     if (typeof html !== "string" || !html.trim()) {
-      throw new https_1.HttpsError("invalid-argument", "Contenido vacío.");
+      return res.status(400).json({ error: "Contenido vacío." });
     }
+
+    // Verificar API Key
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-      throw new https_1.HttpsError("failed-precondition", "RESEND_API_KEY no está configurada.");
+      return res.status(500).json({ error: "RESEND_API_KEY no está configurada en Vercel." });
     }
-    const resend = new resend_1.Resend(apiKey);
+
+    // Envío con Resend
+    const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from: "Kairos <onboarding@resend.dev>",
       to: [to.trim()],
       subject: subject.trim(),
-      html,
+      html: html,
     });
+
     if (error) {
-      console.error("Resend error", error);
-      throw new https_1.HttpsError("internal", "No se pudo enviar el correo.");
+      console.error("Resend error:", error);
+      return res.status(400).json({ error: "No se pudo enviar el correo." });
     }
-    return { id: data?.id };
-  },
-);
+
+    return res.status(200).json({ id: data?.id, success: true });
+  } catch (err) {
+    console.error("Server error:", err);
+    return res.status(500).json({ error: "Error interno del servidor." });
+  }
+};
